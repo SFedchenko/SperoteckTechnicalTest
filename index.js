@@ -1,6 +1,21 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { MongoClient } = require('mongodb');
+
+const uri = 'mongodb+srv://sfedchenko:iJPRo9Sa9yczYMDV@cluster0.qnq9gfj.mongodb.net/?retryWrites=true&w=majority';
+
+const client = new MongoClient(uri);
+
+async function insertRecord(customerData) {
+    try {
+        const database = client.db("eCommerce");
+        const customers = database.collection("customers");
+        const result = await customers.insertOne(customerData);
+    } finally {
+        await client.close();
+    }
+};
 
 const server = http.createServer(
     (req, res) => {
@@ -39,8 +54,16 @@ const server = http.createServer(
                         inputsObject[el[0]] = el[1];
                     };
                     if (inputsObject.age >= 18) {
+                        delete inputsObject.age;
+                        insertRecord(inputsObject).catch(error => {
+                            res.end(`
+                                <h2>Oops, there was an error. Please, try again.</h2>
+                                <a href="/">Return to form</a>
+                            `);
+                            console.log(error);
+                        });
                         res.end(`
-                            <h2>Hello, ${inputsObject.firstName} ${inputsObject.lastName}!</h2>
+                            <h2>Customer record was saved successfully.</h2>
                             <a href="/">Return to form</a>
                         `);
                     } else {
