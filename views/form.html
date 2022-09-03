@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Input</title>
+</head>
+<body>
+    <h3>Enter details</h3>
+
+    <form method="post" action="/response">
+        <label for="firstName">First name:</label>
+        <input id="firstName" name="firstName" type="text" required/>
+        <label for="lastName">Last name:</label>
+        <input id="lastName" name="lastName" type="text" required/>
+        <label for="age">Age:</label>
+        <input id="age" name="age" type="number" required/><br><br>
+        <button type="submit">Submit</button>
+    </form>
+</body>
+</html>
