@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 
-const uri = 'mongodb+srv://sfedchenko:<password>@cluster0.qnq9gfj.mongodb.net/?retryWrites=true&w=majority';
+const uri = 'mongodb+srv://sfedchenko:hCWjGpfLLfLPHbCY@cluster0.qnq9gfj.mongodb.net/?retryWrites=true&w=majority';
 
 const client = new MongoClient(uri);
 
@@ -53,8 +53,45 @@ async function getFullNamesByEmail(requestedEmail, res) {
     } finally {
         await client.close();
     }
-  };
-  
+};
+
+async function getCustomersDataCsv(res) {
+    try {
+        const database = client.db("eCommerce");
+        const customers = database.collection("customers");
+        const query = {};
+        const options = {
+            projection: { _id: 1, email: 1, firstName: 1, lastName: 1 },
+        };
+        const cursor = customers.find(query, options);
+        const records = await cursor.toArray();
+        let csv = 'Id,Email,First name,Last Name\r\n';
+        for (const record of records) {
+            csv += record._id + ',' + record.email + ',' + record.firstName + ',' + record.lastName + '\r\n';
+        }
+        fs.writeFile(
+            path.join(__dirname, 'customers.csv'),
+            csv,
+            (err) => {
+                if (err) {
+                    res.end(`
+                        <h2>Oops, something went wrong. Please, try again.</h2>
+                        <a href="/">Return to form</a><br><br>
+                        <a href="/search">Return to search</a>
+                    `);
+                } else {
+                    res.end(`
+                        <h2>CSV file was successfully saved to current project directory. Check it out.</h2>
+                        <a href="/">Return to form</a><br><br>
+                        <a href="/search">Return to search</a>
+                    `);
+                }
+            }
+        );
+    } finally {
+        await client.close();
+    }
+};
 
 const server = http.createServer(
     (req, res) => {
@@ -81,7 +118,16 @@ const server = http.createServer(
                         res.end(content);
                     }
                 );
-            };
+            } else if (req.url === '/reqres.in/api/users') {
+                getCustomersDataCsv(res).catch(error => {
+                    res.end(`
+                        <h2>Oops, something went wrong. Please, try again.</h2>
+                        <a href="/">Return to form</a><br><br>
+                        <a href="/search">Return to search</a>
+                    `);
+                    console.log(error);
+                });
+            }
         } else if (req.method === 'POST') {
             if (req.url === '/response') {
                 const inputsBuffer = [];
