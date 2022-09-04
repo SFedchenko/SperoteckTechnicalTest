@@ -3,19 +3,58 @@ const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 
-const uri = 'mongodb+srv://sfedchenko:iJPRo9Sa9yczYMDV@cluster0.qnq9gfj.mongodb.net/?retryWrites=true&w=majority';
+const uri = 'mongodb+srv://sfedchenko:<password>@cluster0.qnq9gfj.mongodb.net/?retryWrites=true&w=majority';
 
 const client = new MongoClient(uri);
 
-async function insertRecord(customerData) {
+async function insertRecord(customerData, res) {
     try {
         const database = client.db("eCommerce");
         const customers = database.collection("customers");
         const result = await customers.insertOne(customerData);
+        res.end(`
+            <h2>Customer record was saved successfully. Id - ${result.insertedId}.</h2>
+            <a href="/">Return to form</a><br><br>
+            <a href="/search">Return to search</a>
+        `);
     } finally {
         await client.close();
     }
 };
+
+async function getFullNamesByEmail(requestedEmail, res) {
+    try {
+        const database = client.db("eCommerce");
+        const customers = database.collection("customers");
+        const query = { email: requestedEmail };
+        const options = {
+            projection: { _id: 0, firstName: 1, lastName: 1 },
+        };
+        const cursor = customers.find(query, options);
+        const records = (await cursor.toArray()).map(element =>
+            element.firstName + ' ' + element.lastName);
+        if (records.length === 0) {
+            res.end(`
+                <h2>There are no records for this email.</h2>
+                <a href="/">Return to form</a><br><br>
+                <a href="/search">Return to search</a>
+            `);
+        } else {
+            const recordsToDisplay = records.map(element =>
+                '<p>' + element + '</p>').join('');
+            console.log(recordsToDisplay);
+            res.end(`
+                <h2>Appropriate data for requested email:</h2>
+                ${recordsToDisplay}
+                <a href="/">Return to form</a><br><br>
+                <a href="/search">Return to search</a>
+            `);
+        };
+    } finally {
+        await client.close();
+    }
+  };
+  
 
 const server = http.createServer(
     (req, res) => {
@@ -33,7 +72,16 @@ const server = http.createServer(
                         res.end(content);
                     }
                 );
-            }
+            } else if (req.url === '/search') {
+                fs.readFile(
+                    path.join(__dirname, 'views', 'search.html'),
+                    'utf-8',
+                    (err, content) => {
+                        if (err) throw err;
+                        res.end(content);
+                    }
+                );
+            };
         } else if (req.method === 'POST') {
             if (req.url === '/response') {
                 const inputsBuffer = [];
@@ -55,23 +103,41 @@ const server = http.createServer(
                     };
                     if (inputsObject.age >= 18) {
                         delete inputsObject.age;
-                        insertRecord(inputsObject).catch(error => {
+                        insertRecord(inputsObject, res).catch(error => {
                             res.end(`
-                                <h2>Oops, there was an error. Please, try again.</h2>
-                                <a href="/">Return to form</a>
+                                <h2>Oops, something went wrong. Please, try again.</h2>
+                                <a href="/">Return to form</a><br><br>
+                                <a href="/search">Return to search</a>
                             `);
                             console.log(error);
                         });
-                        res.end(`
-                            <h2>Customer record was saved successfully.</h2>
-                            <a href="/">Return to form</a>
-                        `);
                     } else {
                         res.end(`
                         <h2>Hello, ${inputsObject.firstName}! Unfortunately, you will have to wait a bit.</h2>
                         <a href="/">Return to form</a>
                     `);
                     }
+                });
+            } else if (req.url === '/searchByEmail') {
+                const inputsBuffer = [];
+                res.writeHead(200, {
+                    'Content-Type': 'text/html; charset=utf-8'
+                });
+
+                req.on('data', data => {
+                    inputsBuffer.push(Buffer.from(data));
+                });
+
+                req.on('end', () => {
+                    const requestedEmail = inputsBuffer.toString().split('=')[1];
+                    getFullNamesByEmail(requestedEmail, res).catch(error => {
+                        res.end(`
+                            <h2>Oops, something went wrong. Please, try again.</h2>
+                            <a href="/">Return to form</a><br><br>
+                            <a href="/search">Return to search</a>
+                        `);
+                        console.log(error);
+                    });
                 });
             };
         }
